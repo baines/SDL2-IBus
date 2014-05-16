@@ -2161,8 +2161,8 @@ AC_HELP_STRING([--enable-ibus-shared], [dynamically load IBus IME support [[defa
             echo "-- dynamic libglib -> $glib_lib"
             
             AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_IBUS, "$ibus_lib", [ ])
-            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_GOBJECT, "$ibus_lib", [ ])
-            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_GLIB, "$ibus_lib", [ ])
+            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_GOBJECT, "$gobj_lib", [ ])
+            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_GLIB, "$glib_lib", [ ])
             
         else
             EXTRA_LDFLAGS="$EXTRA_LDFLAGS $IBUS_LDFLAGS"
