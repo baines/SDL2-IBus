@@ -58,6 +58,11 @@
 #include <dbus/dbus.h>
 #endif
 
+#ifdef HAVE_IBUS_IBUS_H
+#define SDL_USE_IBUS 1
+#include <ibus-1.0/ibus.h>
+#endif
+
 #include "SDL_x11dyn.h"
 
 #include "SDL_x11clipboard.h"
@@ -69,6 +74,55 @@
 #include "SDL_x11window.h"
 
 /* Private display data */
+
+#ifdef HAVE_IBUS_IBUS_H
+typedef struct SDL_IBusHandler
+{
+    IBusBus* bus;
+    IBusInputContext* context;
+    GMainContext* glib_main_context;
+    SDL_bool active;
+    SDL_bool initialized;
+    SDL_Rect cursor_rect;
+    int init_attempts;
+    
+    void *libibus_handle, *libgobject_handle, *libglib_handle;
+    
+    /* Dynamic function prototypes */
+    
+    void (*ibus_init)(void);
+    IBusBus *(*ibus_bus_new)(void);
+    gboolean (*ibus_bus_is_connected)(IBusBus* bus);
+    IBusInputContext *(*ibus_bus_create_input_context)(IBusBus *bus, 
+        const gchar *client_name);
+    void (*ibus_input_context_set_capabilities)(IBusInputContext *, 
+        guint32 capabilities);
+    void (*ibus_input_context_set_cursor_location)(IBusInputContext *, 
+        gint32 x, gint32 y, gint32 w, gint32 h);
+    gboolean (*ibus_input_context_process_key_event)(IBusInputContext *, 
+        guint32 keyval, guint32 keycode, guint32 state);
+    void (*ibus_input_context_reset)(IBusInputContext *);
+    void (*ibus_input_context_focus_in)(IBusInputContext *);
+    void (*ibus_input_context_focus_out)(IBusInputContext *);
+    const gchar *(*ibus_text_get_text)(IBusText *);
+    guint (*ibus_text_get_length)(IBusText *);
+    void (*ibus_proxy_destroy)(IBusProxy *);
+    gboolean (*ibus_bus_exit)(IBusBus *, gboolean);
+    
+    gulong (*g_signal_connect_data)(gpointer, const gchar *, GCallback,
+        gpointer, GClosureNotify, GConnectFlags);
+    guint (*g_signal_handlers_disconnect_matched)(gpointer, GSignalMatchType,
+        guint , GQuark detail, GClosure	*, gpointer, gpointer);
+    void (*g_object_unref)(gpointer);
+    
+    GMainContext *(*g_main_context_new)(void);
+    void (*g_main_context_push_thread_default)(GMainContext *);
+    void (*g_main_context_pop_thread_default)(GMainContext *);
+    gboolean (*g_main_context_iteration)(GMainContext *, gboolean);
+    void (*g_main_context_unref)(GMainContext *);
+    
+} SDL_IBusHandler;
+#endif
 
 typedef struct SDL_VideoData
 {
@@ -113,6 +167,10 @@ typedef struct SDL_VideoData
 
     SDL_Scancode key_layout[256];
     SDL_bool selection_waiting;
+    
+#if SDL_USE_IBUS
+    SDL_IBusHandler ibus;
+#endif
 
 #if SDL_USE_LIBDBUS
     DBusConnection *dbus;
