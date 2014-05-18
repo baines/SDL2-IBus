@@ -144,176 +144,6 @@ static const struct
 };
 /* *INDENT-OFF* */
 
-#ifdef SDL_USE_IBUS
-#ifdef SDL_IBUS_DYNAMIC_IBUS
-    #include "SDL_loadso.h"
-#endif
-
-static int IME_IBusLoadSyms(SDL_IBusHandler* ibus)
-{       
-    SDL_bool ok = SDL_TRUE;
-
-/* Dynamically load libraries? */
-#ifdef SDL_IBUS_DYNAMIC_IBUS
-    void* libibus    = SDL_LoadObject(SDL_IBUS_DYNAMIC_IBUS);
-    void* libgobject = SDL_LoadObject(SDL_IBUS_DYNAMIC_GOBJECT);
-    void* libglib    = SDL_LoadObject(SDL_IBUS_DYNAMIC_GLIB);
-    
-    if(!(libibus && libgobject && libglib)) return SDL_FALSE;
-    
-    #define SDL_IBUS_SYM(handle, name) \
-        ibus->name = SDL_LoadFunction(handle, #name); \
-        ok = ok && ibus->name
-#else
-    #define SDL_IBUS_SYM(handle, name) \
-        ibus->name = &name
-
-#endif
-
-    SDL_IBUS_SYM(libibus, ibus_init);
-    SDL_IBUS_SYM(libibus, ibus_bus_new);
-    SDL_IBUS_SYM(libibus, ibus_bus_is_connected);
-    SDL_IBUS_SYM(libibus, ibus_bus_create_input_context);
-    SDL_IBUS_SYM(libibus, ibus_input_context_set_capabilities);
-    SDL_IBUS_SYM(libibus, ibus_input_context_set_cursor_location);
-    SDL_IBUS_SYM(libibus, ibus_input_context_process_key_event);
-    SDL_IBUS_SYM(libibus, ibus_input_context_reset);
-    SDL_IBUS_SYM(libibus, ibus_input_context_focus_in);
-    SDL_IBUS_SYM(libibus, ibus_input_context_focus_out);
-    SDL_IBUS_SYM(libibus, ibus_text_get_text);
-    SDL_IBUS_SYM(libibus, ibus_text_get_length);
-    SDL_IBUS_SYM(libibus, ibus_proxy_destroy);
-    SDL_IBUS_SYM(libibus, ibus_bus_exit);
-    
-    SDL_IBUS_SYM(libgobject, g_signal_connect_data);
-    SDL_IBUS_SYM(libgobject, g_signal_handlers_disconnect_matched);
-    SDL_IBUS_SYM(libgobject, g_object_unref);
-    
-    SDL_IBUS_SYM(libglib, g_main_context_new);
-    SDL_IBUS_SYM(libglib, g_main_context_push_thread_default);
-    SDL_IBUS_SYM(libglib, g_main_context_pop_thread_default);
-    SDL_IBUS_SYM(libglib, g_main_context_iteration);
-    SDL_IBUS_SYM(libglib, g_main_context_unref);
-    
-    #undef SDL_IBUS_SYM
-    
-#ifdef SDL_IBUS_DYNAMIC_IBUS
-    if(ok){
-        ibus->libibus_handle = libibus;
-        ibus->libgobject_handle = libgobject;
-        ibus->libglib_handle = libglib;
-    } else {
-        SDL_UnloadObject(libibus);
-        SDL_UnloadObject(libgobject);
-        SDL_UnloadObject(libglib);
-    }
-#endif
- 
-    return ok;
-}
-
-static void IME_IBusTextCommitted(IBusInputContext *c, IBusText *t, SDL_IBusHandler* ibus)
-{
-    const char* text = ibus->ibus_text_get_text(t);
-    SDL_SendKeyboardText(text);
-}
-
-static void IME_IBusTextEdit(IBusInputContext *c, IBusText *t, guint cursor_pos, 
-                                                  gboolean visible, SDL_IBusHandler* ibus)
-{
-    if(visible){
-        /* Reposition the candidate list */
-        SDL_Window* focused_win = SDL_GetFocusWindow();
-        if(focused_win){
-            int x = 0, y = 0;
-            
-            SDL_GetWindowPosition(focused_win, &x, &y);
-            SDL_Rect* rect = &ibus->cursor_rect;
-            
-           ibus->ibus_input_context_set_cursor_location(
-                ibus->context, rect->x + x, rect->y + y, rect->w, rect->h);
-        }
-        
-        const char* text = ibus->ibus_text_get_text(t);
-        int num_chars = ibus->ibus_text_get_length(t);
-            
-        SDL_SendEditingText(text, cursor_pos, num_chars);
-    }
-}
-
-static void
-IME_IBusSetupConnection(SDL_IBusHandler* ibus)
-{
-    ibus->g_main_context_push_thread_default(ibus->glib_main_context);
-        
-    ibus->context = ibus->ibus_bus_create_input_context(ibus->bus, "SDL-2");
-    ibus->ibus_input_context_set_capabilities(ibus->context, IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS );
-    
-    ibus->g_signal_connect(ibus->context, "commit-text", G_CALLBACK(IME_IBusTextCommitted), ibus);
-    ibus->g_signal_connect(ibus->context, "update-preedit-text", G_CALLBACK(IME_IBusTextEdit), ibus);
-    
-    ibus->g_main_context_pop_thread_default(ibus->glib_main_context);
-}
-
-static void
-IME_IBusConnectCallback(IBusBus* unused, SDL_IBusHandler *ibus)
-{
-    IME_IBusSetupConnection(ibus);
-}
-
-static void
-IME_Init(SDL_VideoData *videodata)
-{
-    if(!videodata->ibus.initialized){
-        SDL_IBusHandler* ibus = &videodata->ibus;
-        
-        if(!IME_IBusLoadSyms(ibus)) return;
-        
-        ibus->ibus_init();
-        
-        ibus->initialized = SDL_TRUE;
-        ibus->glib_main_context = ibus->g_main_context_new();
-        ibus->bus = ibus->ibus_bus_new();
-
-        if (ibus->ibus_bus_is_connected(ibus->bus)) {
-            IME_IBusSetupConnection(ibus);
-        } else {      
-            ibus->g_main_context_push_thread_default(ibus->glib_main_context);
-            ibus->g_signal_connect(ibus->bus, "connected", G_CALLBACK(IME_IBusConnectCallback), ibus);
-            ibus->g_main_context_pop_thread_default(ibus->glib_main_context);
-        }
-    }
-}
-
-static void IME_Quit(SDL_VideoData *videodata)
-{
-    SDL_IBusHandler *ibus = &videodata->ibus;
-    
-    if(ibus->initialized){
-/* Unload libraries */
-#ifdef SDL_IBUS_DYNAMIC_IBUS
-    
-        if(ibus->libibus_handle)    SDL_UnloadObject(ibus->libibus_handle);
-        if(ibus->libgobject_handle) SDL_UnloadObject(ibus->libgobject_handle);
-        if(ibus->libglib_handle)    SDL_UnloadObject(ibus->libglib_handle);
-
-#endif
-
-        ibus->g_main_context_push_thread_default(ibus->glib_main_context);
-
-        ibus->g_signal_handlers_disconnect_matched(ibus->context, 
-            G_SIGNAL_MATCH_DATA, 0, 0, NULL, NULL, ibus);
-            
-        /* FIXME: More cleanup is required for bus, input context e.t.c. */
-        
-        ibus->g_main_context_pop_thread_default(ibus->glib_main_context);
-        ibus->g_main_context_unref(ibus->glib_main_context);
-    }
-    
-     memset(ibus, 0, sizeof(*ibus));
-}
-#endif
-
 /* This function only works for keyboards in US QWERTY layout */
 static SDL_Scancode
 X11_KeyCodeToSDLScancode(Display *display, KeyCode keycode)
@@ -491,69 +321,30 @@ void
 X11_QuitKeyboard(_THIS)
 {
 #ifdef SDL_USE_IBUS
-    IME_Quit((SDL_VideoData*)_this->driverdata);
+    SDL_IBus_Quit();
 #endif
 }
 
 void
 X11_StartTextInput(_THIS)
 {
-#ifdef SDL_USE_IBUS
-    SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
-
-    if(videodata->ibus.init_attempts == 0){
-        /* This function will set ibus.initialized to SDL_TRUE if successful */
-        IME_Init(videodata);
-        videodata->ibus.init_attempts++;
-    }
-
-    if(videodata->ibus.initialized){
-        videodata->ibus.active = SDL_TRUE;
-    }
-#endif
 }
 
 void
 X11_StopTextInput(_THIS)
 {
-#ifdef SDL_USE_IBUS
-    SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
-    
-    if(videodata->ibus.initialized){
-        videodata->ibus.ibus_input_context_reset(videodata->ibus.context);
-    }
-    videodata->ibus.active = SDL_FALSE;
-#endif
 }
 
 void
 X11_SetTextInputRect(_THIS, SDL_Rect *rect)
 {
-#ifdef SDL_USE_IBUS
     if (!rect) {
         SDL_InvalidParamError("rect");
         return;
     }
-    SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
-    
-    if (videodata->ibus.init_attempts == 0) {
-        IME_Init(videodata);
-        videodata->ibus.init_attempts++;
-    }
-    
-    if(videodata->ibus.initialized){
-        /* Save the rect so the cursor can be updated when the window moves */
-        SDL_memcpy(&videodata->ibus.cursor_rect, rect, sizeof(SDL_Rect));    
-        
-        int x, y;
-        SDL_Window* focused_win = SDL_GetFocusWindow();
-        if(focused_win){
-            SDL_GetWindowPosition(focused_win, &x, &y);
-        
-            videodata->ibus.ibus_input_context_set_cursor_location(
-                videodata->ibus.context, rect->x + x, rect->y + y, rect->w, rect->h);
-        }
-   }
+       
+#ifdef SDL_USE_IBUS
+    SDL_IBus_UpdateTextRect(rect);
 #endif
 }
 

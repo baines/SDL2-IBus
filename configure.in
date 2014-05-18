@@ -2110,6 +2110,7 @@ AC_HELP_STRING([--enable-dbus], [enable D-Bus support [[default=yes]]]),
             if test x$have_dbus_dbus_h_hdr = xyes; then
                 AC_DEFINE(HAVE_DBUS_DBUS_H, 1, [ ])
                 EXTRA_CFLAGS="$EXTRA_CFLAGS $DBUS_CFLAGS"
+                SOURCES="$SOURCES $srcdir/src/core/linux/SDL_dbus.c"
             fi
         fi
     fi
@@ -2121,12 +2122,10 @@ CheckIBus()
     AC_ARG_ENABLE(ibus,
 AC_HELP_STRING([--enable-ibus], [enable IBus support [[default=yes]]]),
                   , enable_ibus=yes)
-
     if test x$enable_ibus = xyes; then
         AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
         if test x$PKG_CONFIG != xno; then
             IBUS_CFLAGS=`$PKG_CONFIG --cflags ibus-1.0`
-            IBUS_LDFLAGS=`$PKG_CONFIG --libs ibus-1.0`
             save_CFLAGS="$CFLAGS"
             CFLAGS="$save_CFLAGS $IBUS_CFLAGS"
             AC_CHECK_HEADER(ibus-1.0/ibus.h,
@@ -2134,38 +2133,15 @@ AC_HELP_STRING([--enable-ibus], [enable IBus support [[default=yes]]]),
                             have_ibus_ibus_h_hdr=no)
             CFLAGS="$save_CFLAGS"
             if test x$have_ibus_ibus_h_hdr = xyes; then
-                AC_DEFINE(HAVE_IBUS_IBUS_H, 1, [ ])
-                EXTRA_CFLAGS="$EXTRA_CFLAGS $IBUS_CFLAGS"
+                if test x$enable_dbus != xyes; then
+                    AC_MSG_WARN([DBus support is required for IBus.])
+                    have_ibus_ibus_h_hdr=no
+                else
+                    AC_DEFINE(HAVE_IBUS_IBUS_H, 1, [ ])
+                    EXTRA_CFLAGS="$EXTRA_CFLAGS $IBUS_CFLAGS"
+                    SOURCES="$SOURCES $srcdir/src/core/linux/SDL_ibus.c"
+               fi
             fi
-        fi
-        AC_ARG_ENABLE(ibus-shared,
-AC_HELP_STRING([--enable-ibus-shared], [dynamically load IBus IME support [[default=yes]]]),
-                            , enable_ibus_shared=yes)
-        if test x$have_loadso != xyes && \
-           test x$enable_ibus_shared = xyes; then
-            AC_MSG_WARN([You must have SDL_LoadObject() support for dynamic IBus Loading])
-        fi
-        
-        ibus_lib=[`find_lib "libibus-1.0.so" "$IBUS_LIBS" | sed 's/.*\/\(.*\)/\1/; q'`]
-        gobj_lib=[`find_lib "libgobject-2.0.so" "$GOBJECT_LIBS" | sed 's/.*\/\(.*\)/\1/; q'`]
-        glib_lib=[`find_lib "libglib-2.0.so" "$GLIB_LIBS" | sed 's/.*\/\(.*\)/\1/; q'`]
-                
-        if test x$have_loadso = xyes && \
-           test x$enable_ibus_shared = xyes && \
-           test x$ibus_lib != x && test x$gobj_lib != x && test x$glib_lib != x; then
-            
-            have_ibus_dynamic=yes
-            
-            echo "-- dynamic libibus -> $ibus_lib"
-            echo "-- dynamic libgobject -> $gobj_lib"
-            echo "-- dynamic libglib -> $glib_lib"
-            
-            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_IBUS, "$ibus_lib", [ ])
-            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_GOBJECT, "$gobj_lib", [ ])
-            AC_DEFINE_UNQUOTED(SDL_IBUS_DYNAMIC_GLIB, "$glib_lib", [ ])
-            
-        else
-            EXTRA_LDFLAGS="$EXTRA_LDFLAGS $IBUS_LDFLAGS"
         fi
     fi
 }
@@ -3360,11 +3336,7 @@ else
     SUMMARY="${SUMMARY}Using dbus      : NO\n"
 fi
 if test x$have_ibus_ibus_h_hdr = xyes; then
-    if test x$have_ibus_dynamic = xyes; then
-        SUMMARY="${SUMMARY}Using ibus      : YES (DYNAMIC)\n"
-    else
-        SUMMARY="${SUMMARY}Using ibus      : YES\n"
-    fi
+    SUMMARY="${SUMMARY}Using ibus      : YES\n"
 else
     SUMMARY="${SUMMARY}Using ibus      : NO\n"
 fi

@@ -40,25 +40,6 @@
 
 #include <stdio.h>
 
-#ifdef SDL_USE_IBUS
-static Uint32 IME_IBusModState(void){
-    Uint32 ibus_mods = 0;
-    SDL_Keymod sdl_mods = SDL_GetModState();
-    
-    /* Not sure about MOD3, MOD4 and HYPER mappings */
-    if(sdl_mods & KMOD_LSHIFT) ibus_mods |= IBUS_SHIFT_MASK;
-    if(sdl_mods & KMOD_CAPS)   ibus_mods |= IBUS_LOCK_MASK;
-    if(sdl_mods & KMOD_LCTRL)  ibus_mods |= IBUS_CONTROL_MASK;
-    if(sdl_mods & KMOD_LALT)   ibus_mods |= IBUS_MOD1_MASK;
-    if(sdl_mods & KMOD_NUM)    ibus_mods |= IBUS_MOD2_MASK;
-    if(sdl_mods & KMOD_MODE)   ibus_mods |= IBUS_MOD5_MASK;
-    if(sdl_mods & KMOD_LGUI)   ibus_mods |= IBUS_SUPER_MASK;
-    if(sdl_mods & KMOD_RGUI)   ibus_mods |= IBUS_META_MASK;
-
-    return ibus_mods;
-}
-#endif
-
 typedef struct {
     unsigned char *data;
     int format, count;
@@ -435,9 +416,7 @@ X11_DispatchEvent(_THIS)
             printf("window %p: FocusIn!\n", data);
 #endif
 #ifdef SDL_USE_IBUS
-            if(videodata->ibus.initialized && videodata->ibus.context) {
-                videodata->ibus.ibus_input_context_focus_in(videodata->ibus.context);
-            }
+            SDL_IBus_SetFocus(SDL_TRUE);
 #endif
             if (data->pending_focus == PENDING_FOCUS_OUT &&
                 data->window == SDL_GetKeyboardFocus()) {
@@ -477,9 +456,7 @@ X11_DispatchEvent(_THIS)
             printf("window %p: FocusOut!\n", data);
 #endif
 #ifdef SDL_USE_IBUS
-            if(videodata->ibus.initialized && videodata->ibus.context) {
-                videodata->ibus.ibus_input_context_focus_out(videodata->ibus.context);
-            }
+            SDL_IBus_SetFocus(SDL_FALSE);
 #endif
             data->pending_focus = PENDING_FOCUS_OUT;
             data->pending_focus_time = SDL_GetTicks() + PENDING_FOCUS_OUT_TIME;
@@ -543,14 +520,10 @@ X11_DispatchEvent(_THIS)
             XLookupString(&xevent.xkey, text, sizeof(text), &keysym, NULL);
 #endif
 #ifdef SDL_USE_IBUS
-            if(videodata->ibus.active && videodata->ibus.context) {
-                if(!videodata->ibus.ibus_input_context_process_key_event(
-                        videodata->ibus.context,
-                        keysym,
-                        keycode,
-                        IME_IBusModState())){
+            if(SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE){
+                if(!SDL_IBus_ProcessKeyEvent(keysym, keycode)){
 #endif
-                    if (*text) {
+                    if(*text){
                         SDL_SendKeyboardText(text);
                     }
 #ifdef SDL_USE_IBUS
@@ -571,15 +544,6 @@ X11_DispatchEvent(_THIS)
                 /* We're about to get a repeated key down, ignore the key up */
                 break;
             }
-#ifdef SDL_USE_IBUS
-            if(videodata->ibus.active && videodata->ibus.context) {
-                videodata->ibus.ibus_input_context_process_key_event(
-                        videodata->ibus.context,
-                        NoSymbol,
-                        keycode,
-                        IME_IBusModState() | IBUS_RELEASE_MASK);
-            }
-#endif
             SDL_SendKeyboardKey(SDL_RELEASED, videodata->key_layout[keycode]);
         }
         break;
@@ -637,17 +601,7 @@ X11_DispatchEvent(_THIS)
                                     xevent.xconfigure.y - border_top);
 #ifdef SDL_USE_IBUS
                 /* Update IBus candidate list position */
-                if(videodata->ibus.initialized){
-                    SDL_Rect* rect = &videodata->ibus.cursor_rect;
-                    int x, y;
-                    SDL_Window* focused_win = SDL_GetFocusWindow();
-                    if(focused_win){
-                        SDL_GetWindowPosition(focused_win, &x, &y);
-                    
-                        videodata->ibus.ibus_input_context_set_cursor_location(
-                            videodata->ibus.context, rect->x + x, rect->y + y, rect->w, rect->h);
-                    }
-               }
+                SDL_IBus_UpdateTextRect(NULL);
 #endif
             }
             if (xevent.xconfigure.width != data->last_xconfigure.width ||
@@ -1065,19 +1019,16 @@ X11_PumpEvents(_THIS)
             SDL_TICKS_PASSED(now, data->screensaver_activity + 30000)) {
             X11_XResetScreenSaver(data->display);
 
-            #if SDL_USE_LIBDBUS
-            SDL_dbus_screensaver_tickle(_this);
-            #endif
+#if SDL_USE_LIBDBUS
+            SDL_DBus_ScreensaverTickle();
+#endif
 
             data->screensaver_activity = now;
         }
     }
-    
+
 #ifdef SDL_USE_IBUS
-    /* Pump IBus glib events */
-    if (data->ibus.initialized) {
-        data->ibus.g_main_context_iteration(data->ibus.glib_main_context, FALSE);
-    }
+    SDL_IBus_PumpEvents();
 #endif
 
     /* Keep processing pending events */
@@ -1100,12 +1051,12 @@ X11_SuspendScreenSaver(_THIS)
 #endif /* SDL_VIDEO_DRIVER_X11_XSCRNSAVER */
 
 #if SDL_USE_LIBDBUS
-    if (SDL_dbus_screensaver_inhibit(_this)) {
+    if (SDL_DBus_ScreensaverInhibit(_this->suspend_screensaver)) {
         return;
     }
 
     if (_this->suspend_screensaver) {
-        SDL_dbus_screensaver_tickle(_this);
+        SDL_DBus_ScreensaverTickle();
     }
 #endif
 
