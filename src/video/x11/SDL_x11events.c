@@ -416,7 +416,9 @@ X11_DispatchEvent(_THIS)
             printf("window %p: FocusIn!\n", data);
 #endif
 #ifdef SDL_USE_IBUS
-            SDL_IBus_SetFocus(SDL_TRUE);
+            if(SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE){
+                SDL_IBus_SetFocus(SDL_TRUE);
+            }
 #endif
             if (data->pending_focus == PENDING_FOCUS_OUT &&
                 data->window == SDL_GetKeyboardFocus()) {
@@ -456,7 +458,9 @@ X11_DispatchEvent(_THIS)
             printf("window %p: FocusOut!\n", data);
 #endif
 #ifdef SDL_USE_IBUS
-            SDL_IBus_SetFocus(SDL_FALSE);
+            if(SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE){
+                SDL_IBus_SetFocus(SDL_FALSE);
+            }
 #endif
             data->pending_focus = PENDING_FOCUS_OUT;
             data->pending_focus_time = SDL_GetTicks() + PENDING_FOCUS_OUT_TIME;
@@ -600,8 +604,10 @@ X11_DispatchEvent(_THIS)
                                     xevent.xconfigure.x - border_left,
                                     xevent.xconfigure.y - border_top);
 #ifdef SDL_USE_IBUS
-                /* Update IBus candidate list position */
-                SDL_IBus_UpdateTextRect(NULL);
+                if(SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE){
+                    /* Update IBus candidate list position */
+                    SDL_IBus_UpdateTextRect(NULL);
+                }
 #endif
             }
             if (xevent.xconfigure.width != data->last_xconfigure.width ||
@@ -1028,7 +1034,9 @@ X11_PumpEvents(_THIS)
     }
 
 #ifdef SDL_USE_IBUS
-    SDL_IBus_PumpEvents();
+    if(SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE){
+        SDL_IBus_PumpEvents();
+    }
 #endif
 
     /* Keep processing pending events */

@@ -287,6 +287,10 @@ X11_InitKeyboard(_THIS)
 
     SDL_SetScancodeName(SDL_SCANCODE_APPLICATION, "Menu");
 
+#ifdef SDL_USE_IBUS
+    SDL_IBus_Init();
+#endif
+
     return 0;
 }
 
@@ -328,11 +332,13 @@ X11_QuitKeyboard(_THIS)
 void
 X11_StartTextInput(_THIS)
 {
+    SDL_IBus_SetFocus(SDL_GetFocusWindow() != NULL);
 }
 
 void
 X11_StopTextInput(_THIS)
 {
+    SDL_IBus_SetFocus(SDL_GetFocusWindow() != NULL);
 }
 
 void

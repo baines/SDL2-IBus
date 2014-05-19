@@ -35,7 +35,7 @@ static const char IBUS_INPUT_INTERFACE[] = "org.freedesktop.IBus.InputContext";
 static char *input_ctx_path = NULL;
 static SDL_Rect ibus_cursor_rect = {0};
 static DBusConnection *ibus_conn = NULL;
-static char *ibus_address = NULL;
+static char *ibus_addr_file = NULL;
 
 static Uint32
 IBus_ModState(void)
@@ -144,10 +144,41 @@ IBus_MessageFilter(DBusConnection *conn, DBusMessage *msg, void *user_data)
 }
 
 static char *
+IBus_GetAddressFromFile(const char* file_path)
+{
+    FILE *addr_file = fopen(file_path, "r");
+    if(!addr_file){
+        return NULL;
+    }
+
+    char addr_buf[1024];
+    SDL_bool success = SDL_FALSE;
+
+    while(fgets(addr_buf, sizeof(addr_buf), addr_file)){
+        if(SDL_strncmp(addr_buf, "IBUS_ADDRESS=", sizeof("IBUS_ADDRESS=")-1) == 0){
+            size_t sz = SDL_strlen(addr_buf);
+            if(addr_buf[sz-1] == '\n') addr_buf[sz-1] = 0;
+            if(addr_buf[sz-2] == '\r') addr_buf[sz-2] = 0;
+            success = SDL_TRUE;
+            break;
+        }
+    }
+
+    fclose(addr_file);
+
+    if(success){
+        char *result = SDL_strdup(addr_buf + (sizeof("IBUS_ADDRESS=") - 1));
+        return result;
+    } else {
+        return NULL;
+    }
+}
+
+static char *
 IBus_GetDBusAddress(void)
 {
-    if(ibus_address){
-        return SDL_strdup(ibus_address);
+    if(ibus_addr_file){
+        return IBus_GetAddressFromFile(ibus_addr_file);
     }
     
     SDL_DBusContext *dbus = SDL_DBus_GetContext();
@@ -182,18 +213,19 @@ IBus_GetDBusAddress(void)
         return NULL;
     }
     
+    *disp_num = 0;
     disp_num++;
     
     if(screen_num){
         *screen_num = 0;
     }
     
-    if(*host == ':'){
+    if(!*host){
         host = "unix";
     }
         
     char config_dir[PATH_MAX];
-    SDL_zero(config_dir);
+    SDL_memset(config_dir, 0, sizeof(config_dir));
     
     const char *conf_env = SDL_getenv("XDG_CONFIG_HOME");
     if(conf_env && *conf_env){
@@ -210,40 +242,16 @@ IBus_GetDBusAddress(void)
     char *key = dbus->get_local_machine_id();
     
     char file_path[PATH_MAX];
-    SDL_zero(file_path);
+    SDL_memset(file_path, 0, sizeof(file_path));
     SDL_snprintf(file_path, sizeof(file_path), "%s/ibus/bus/%s-%s-%s", 
                                                config_dir, key, host, disp_num);
     dbus->free(key);
     SDL_free(display);
     
+    ibus_addr_file = strdup(file_path);
+    
     /* Now actually read the address from the file */
-    FILE *addr_file = fopen(file_path, "r");
-    if(!addr_file){
-        return NULL;
-    }
-    
-    char addr_buf[1024];
-    SDL_bool success = SDL_FALSE;
-    
-    while(fgets(addr_buf, sizeof(addr_buf), addr_file)){ 
-        if(SDL_strncmp(addr_buf, "IBUS_ADDRESS=", sizeof("IBUS_ADDRESS=")-1) == 0){
-            size_t sz = SDL_strlen(addr_buf);
-            if(addr_buf[sz-1] == '\n') addr_buf[sz-1] = 0;
-            if(addr_buf[sz-2] == '\r') addr_buf[sz-2] = 0;
-            success = SDL_TRUE;
-            break;
-        }
-    }
-    
-    fclose(addr_file);
-    
-    if(success){
-        char *result = SDL_strdup(addr_buf + (sizeof("IBUS_ADDRESS=") - 1));
-        ibus_address = SDL_strdup(result);
-        return result;
-    } else {
-        return NULL;
-    }
+    return IBus_GetAddressFromFile(file_path);
 }
 
 SDL_bool
@@ -252,19 +260,24 @@ SDL_IBus_Init(void)
     SDL_bool result = SDL_FALSE;
     SDL_DBusContext *dbus = SDL_DBus_GetContext();
     char *path = NULL;
-    
+
     if(dbus){
         char* addr = IBus_GetDBusAddress();
         if(!addr){
             return SDL_FALSE;
         }
-        
+
         ibus_conn = dbus->connection_open_private(addr, NULL);
-        
+
         SDL_free(addr);
+
+        if(!ibus_conn){
+            return SDL_FALSE;
+        }
+
         dbus->connection_flush(ibus_conn);
         
-        if(!ibus_conn || !dbus->bus_register(ibus_conn, NULL)){
+        if(!dbus->bus_register(ibus_conn, NULL)){
             ibus_conn = NULL;
             return SDL_FALSE;
         }
@@ -321,6 +334,10 @@ SDL_IBus_Init(void)
         dbus->bus_add_match(ibus_conn, "type='signal',interface='org.freedesktop.IBus.InputContext'", NULL);
         dbus->connection_add_filter(ibus_conn, &IBus_MessageFilter, dbus, NULL);
     }
+
+    if(SDL_GetFocusWindow()){
+        SDL_IBus_SetFocus(SDL_TRUE);
+    }
     
     return result;
 }
@@ -333,9 +350,9 @@ SDL_IBus_Quit(void)
         input_ctx_path = NULL;
     }
     
-    if(ibus_address){
-        SDL_free(ibus_address);
-        ibus_address = NULL;
+    if(ibus_addr_file){
+        SDL_free(ibus_addr_file);
+        ibus_addr_file = NULL;
     }
     
     SDL_DBusContext *dbus = SDL_DBus_GetContext();
