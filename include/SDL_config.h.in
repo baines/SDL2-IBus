@@ -337,9 +337,4 @@
 #undef SDL_ASSEMBLY_ROUTINES
 #undef SDL_ALTIVEC_BLITTERS
 
-/* Enable IBus dynamic loading */
-#undef SDL_IBUS_DYNAMIC_IBUS
-#undef SDL_IBUS_DYNAMIC_GOBJECT
-#undef SDL_IBUS_DYNAMIC_GLIB
-
 #endif /* _SDL_config_h */

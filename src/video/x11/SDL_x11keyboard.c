@@ -332,13 +332,17 @@ X11_QuitKeyboard(_THIS)
 void
 X11_StartTextInput(_THIS)
 {
+#ifdef SDL_USE_IBUS
     SDL_IBus_SetFocus(SDL_GetFocusWindow() != NULL);
+#endif
 }
 
 void
 X11_StopTextInput(_THIS)
 {
-    SDL_IBus_SetFocus(SDL_GetFocusWindow() != NULL);
+#ifdef SDL_USE_IBUS
+    SDL_IBus_Reset();
+#endif
 }
 
 void

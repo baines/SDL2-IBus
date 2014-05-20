@@ -60,7 +60,7 @@ static const char *
 IBus_GetVariantText(DBusConnection *conn, DBusMessageIter *iter, SDL_DBusContext *dbus)
 {
     /* The text we need is nested weirdly, use dbus-monitor to see the structure better */
-    const char* text = NULL;
+    const char *text = NULL;
     DBusMessageIter sub1, sub2;
 
     if(dbus->message_iter_get_arg_type(iter) != DBUS_TYPE_VARIANT){
@@ -79,7 +79,7 @@ IBus_GetVariantText(DBusConnection *conn, DBusMessageIter *iter, SDL_DBusContext
         return NULL;
     }
     
-    const char* struct_id = NULL;
+    const char *struct_id = NULL;
     dbus->message_iter_get_basic(&sub2, &struct_id);
     if(!struct_id || SDL_strncmp(struct_id, "IBusText", sizeof("IBusText")) != 0){
         return NULL;
@@ -106,7 +106,7 @@ IBus_MessageFilter(DBusConnection *conn, DBusMessage *msg, void *user_data)
         DBusMessageIter iter;
         dbus->message_iter_init(msg, &iter);
         
-        const char* text = IBus_GetVariantText(conn, &iter, dbus);
+        const char *text = IBus_GetVariantText(conn, &iter, dbus);
         if(text && *text){
             SDL_SendKeyboardText(text);
         }
@@ -117,7 +117,7 @@ IBus_MessageFilter(DBusConnection *conn, DBusMessage *msg, void *user_data)
     if(dbus->message_is_signal(msg, IBUS_INPUT_INTERFACE, "UpdatePreeditText")){
         DBusMessageIter iter;
         dbus->message_iter_init(msg, &iter);
-        const char* text = IBus_GetVariantText(conn, &iter, dbus);
+        const char *text = IBus_GetVariantText(conn, &iter, dbus);
         
         if(!dbus->message_iter_next(&iter)){
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -144,7 +144,7 @@ IBus_MessageFilter(DBusConnection *conn, DBusMessage *msg, void *user_data)
 }
 
 static char *
-IBus_GetAddressFromFile(const char* file_path)
+IBus_GetAddressFromFile(const char *file_path)
 {
     FILE *addr_file = fopen(file_path, "r");
     if(!addr_file){
@@ -248,7 +248,7 @@ IBus_GetDBusAddress(void)
     dbus->free(key);
     SDL_free(display);
     
-    ibus_addr_file = strdup(file_path);
+    ibus_addr_file = SDL_strdup(file_path);
     
     /* Now actually read the address from the file */
     return IBus_GetAddressFromFile(file_path);
@@ -262,7 +262,7 @@ SDL_IBus_Init(void)
     char *path = NULL;
 
     if(dbus){
-        char* addr = IBus_GetDBusAddress();
+        char *addr = IBus_GetDBusAddress();
         if(!addr){
             return SDL_FALSE;
         }
@@ -289,7 +289,7 @@ SDL_IBus_Init(void)
                                                          IBUS_INTERFACE,
                                                          "CreateInputContext");
         if(msg){
-            const char* client_name = "SDL2_Application";
+            const char *client_name = "SDL2_Application";
             dbus->message_append_args(msg,
                                       DBUS_TYPE_STRING, &client_name,
                                       DBUS_TYPE_INVALID);
@@ -365,14 +365,12 @@ SDL_IBus_Quit(void)
     SDL_memset(&ibus_cursor_rect, 0, sizeof(ibus_cursor_rect));
 }
 
-void
-SDL_IBus_SetFocus(SDL_bool focused)
+static void
+IBus_SimpleMessage(const char *method)
 {
     if(!input_ctx_path){
         if(!SDL_IBus_Init()) return;
     }
-    
-    const char* method = focused ? "FocusIn" : "FocusOut";
     
     SDL_DBusContext *dbus = SDL_DBus_GetContext();
     
@@ -388,6 +386,19 @@ SDL_IBus_SetFocus(SDL_bool focused)
             dbus->message_unref(msg);
         }
     }
+}
+
+void
+SDL_IBus_SetFocus(SDL_bool focused)
+{ 
+    const char *method = focused ? "FocusIn" : "FocusOut";
+    IBus_SimpleMessage(method);
+}
+
+void
+SDL_IBus_Reset(void)
+{
+    IBus_SimpleMessage("Reset");
 }
 
 SDL_bool

@@ -127,12 +127,12 @@ SDL_DBus_Quit(void)
     if (dbus.session_conn) {
         dbus.connection_close(dbus.session_conn);
         dbus.connection_unref(dbus.session_conn);
-        memset(&dbus, 0, sizeof(dbus));
+        SDL_memset(&dbus, 0, sizeof(dbus));
     }
     UnloadDBUSLibrary();
 }
 
-SDL_DBusContext*
+SDL_DBusContext *
 SDL_DBus_GetContext(void)
 {
     if(!dbus_handle || !dbus.session_conn){

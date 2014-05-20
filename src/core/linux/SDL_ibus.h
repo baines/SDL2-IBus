@@ -35,6 +35,9 @@ extern void SDL_IBus_Quit(void);
 /* Lets the IBus server know about changes in window focus */
 extern void SDL_IBus_SetFocus(SDL_bool focused);
 
+/* Closes the candidate list and resets any text currently being edited */
+extern void SDL_IBus_Reset(void);
+
 /* Sends a keypress event to IBus, returns SDL_TRUE if IBus used this event to
    update its candidate list or change input methods. PumpEvents should be
    called some time after this, to recieve the TextInput / TextEditing event back. */
