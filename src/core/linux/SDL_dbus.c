@@ -43,6 +43,7 @@ load_dbus_syms(void)
     SDL_DBUS_SYM(bus_add_match);
     SDL_DBUS_SYM(connection_open_private);
     SDL_DBUS_SYM(connection_set_exit_on_disconnect);
+    SDL_DBUS_SYM(connection_get_is_connected);
     SDL_DBUS_SYM(connection_add_filter);
     SDL_DBUS_SYM(connection_send);
     SDL_DBUS_SYM(connection_send_with_reply_and_block);
