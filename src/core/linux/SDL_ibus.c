@@ -101,12 +101,13 @@ IBus_GetVariantText(DBusConnection *conn, DBusMessageIter *iter, SDL_DBusContext
     return text;
 }
 
-static size_t IBus_utf8_strlen(const char *str)
+static size_t 
+IBus_utf8_strlen(const char *str)
 {
-    size_t utf8_len = 0, byte_len = strlen(str);
+    size_t utf8_len = 0;
     const char *p;
     
-    for(p = str; p < str + byte_len; ++p){
+    for(p = str; *p; ++p){
         if(!((*p & 0x80) && !(*p & 0x40))){
             ++utf8_len;
         }
