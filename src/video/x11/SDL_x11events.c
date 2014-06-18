@@ -498,6 +498,9 @@ X11_DispatchEvent(_THIS)
 #ifdef DEBUG_XEVENTS
             printf("window %p: KeyPress (X11 keycode = 0x%X)\n", data, xevent.xkey.keycode);
 #endif
+#ifndef SDL_USE_IBUS
+            SDL_SendKeyboardKey(SDL_PRESSED, videodata->key_layout[keycode]);
+#endif
 #if 1
             if (videodata->key_layout[keycode] == SDL_SCANCODE_UNKNOWN && keycode) {
                 int min_keycode, max_keycode;
