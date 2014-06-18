@@ -2139,7 +2139,7 @@ AC_HELP_STRING([--enable-ibus], [enable IBus support [[default=yes]]]),
                 if test x$enable_dbus != xyes; then
                     AC_MSG_WARN([DBus support is required for IBus.])
                     have_ibus_ibus_h_hdr=no
-                elif text x$have_inotify_inotify_h_hdr != xyes; then
+                elif test x$have_inotify_inotify_h_hdr != xyes; then
                     AC_MSG_WARN([INotify support is required for IBus.])
                     have_ibus_ibus_h_hdr=no
                 else
