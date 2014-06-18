@@ -493,11 +493,11 @@ X11_DispatchEvent(_THIS)
             KeySym keysym = NoSymbol;
             char text[SDL_TEXTINPUTEVENT_TEXT_SIZE];
             Status status = 0;
+            Bool handled = False;
 
 #ifdef DEBUG_XEVENTS
             printf("window %p: KeyPress (X11 keycode = 0x%X)\n", data, xevent.xkey.keycode);
 #endif
-            SDL_SendKeyboardKey(SDL_PRESSED, videodata->key_layout[keycode]);
 #if 1
             if (videodata->key_layout[keycode] == SDL_SCANCODE_UNKNOWN && keycode) {
                 int min_keycode, max_keycode;
@@ -525,13 +525,17 @@ X11_DispatchEvent(_THIS)
 #endif
 #ifdef SDL_USE_IBUS
             if(SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE){
-                if(!SDL_IBus_ProcessKeyEvent(keysym, keycode)){
+                if(!(handled = SDL_IBus_ProcessKeyEvent(keysym, keycode))){
 #endif
                     if(*text){
                         SDL_SendKeyboardText(text);
                     }
 #ifdef SDL_USE_IBUS
                 }
+            }
+
+            if (!handled) {
+                SDL_SendKeyboardKey(SDL_PRESSED, videodata->key_layout[keycode]);
             }
 #endif
         }
