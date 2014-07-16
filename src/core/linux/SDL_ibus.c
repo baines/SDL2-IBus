@@ -169,6 +169,11 @@ IBus_MessageFilter(DBusConnection *conn, DBusMessage *msg, void *user_data)
         return DBUS_HANDLER_RESULT_HANDLED;
     }
     
+    if(dbus->message_is_signal(msg, IBUS_INPUT_INTERFACE, "HidePreeditText")){
+    	SDL_SendEditingText("", 0, 0);
+    	return DBUS_HANDLER_RESULT_HANDLED;
+    }
+    
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
@@ -331,22 +336,22 @@ IBus_SetupConnection(SDL_DBusContext *dbus, const char* addr)
     }
 
     if(result){
-        DBusMessage *msg = dbus->message_new_method_call(IBUS_SERVICE,
+        DBusMessage *msg2 = dbus->message_new_method_call(IBUS_SERVICE,
                                                          input_ctx_path,
                                                          IBUS_INPUT_INTERFACE,
                                                          "SetCapabilities");
         if(msg){
             Uint32 caps = IBUS_CAP_FOCUS | IBUS_CAP_PREEDIT_TEXT;
-            dbus->message_append_args(msg,
+            dbus->message_append_args(msg2,
                                       DBUS_TYPE_UINT32, &caps,
                                       DBUS_TYPE_INVALID);
         }
         
         if(msg){
-            if(dbus->connection_send(ibus_conn, msg, NULL)){
+            if(dbus->connection_send(ibus_conn, msg2, NULL)){
                 dbus->connection_flush(ibus_conn);
             }
-            dbus->message_unref(msg);
+            dbus->message_unref(msg2);
         }
         
         dbus->bus_add_match(ibus_conn, "type='signal',interface='org.freedesktop.IBus.InputContext'", NULL);
