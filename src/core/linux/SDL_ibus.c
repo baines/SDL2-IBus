@@ -28,7 +28,7 @@
 #include "../../video/SDL_sysvideo.h"
 #include "../../events/SDL_keyboard_c.h"
 
-#ifdef SDL_VIDEO_DRIVER_X11
+#if SDL_VIDEO_DRIVER_X11
     #include "../../video/x11/SDL_x11video.h"
 #endif
 
@@ -563,6 +563,9 @@ SDL_IBus_UpdateTextRect(SDL_Rect *rect)
     
     int x = 0, y = 0;
     
+    SDL_GetWindowPosition(focused_win, &x, &y);
+
+#if SDL_VIDEO_DRIVER_X11
     if(info.subsystem == SDL_SYSWM_X11){
         SDL_DisplayData *displaydata =
             (SDL_DisplayData *) SDL_GetDisplayForWindow(focused_win)->driverdata;
@@ -575,6 +578,7 @@ SDL_IBus_UpdateTextRect(SDL_Rect *rect)
         X11_XTranslateCoordinates(x_disp, x_win, RootWindow(x_disp, x_screen),
             0, 0, &x, &y, &unused);
     }
+#endif
 
     x += ibus_cursor_rect.x;
     y += ibus_cursor_rect.y;
